@@ -1,21 +1,24 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(face_detection)
 
+set(CMAKE_CXX_FLAGS "-std=gnu++0x ${CMAKE_CXX_FLAGS}")
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
-  opencv2
+  image_transport
   roscpp
   rospy
   sensor_msgs
   std_msgs
+  dynamic_reconfigure
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -o0")
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -98,7 +101,9 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
+
 
 ## Declare a cpp library
 # add_library(face_detection
@@ -107,15 +112,25 @@ include_directories(
 
 ## Declare a cpp executable
 # add_executable(face_detection_node src/face_detection_node.cpp)
+add_executable(face_detection src/face_detection.cpp)
+
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(face_detection_node face_detection_generate_messages_cpp)
+add_dependencies(face_detection ${PROJECT_NAME}_gencfg)
+
+
 
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(face_detection_node
 #   ${catkin_LIBRARIES}
 # )
+target_link_libraries(face_detection
+   ${catkin_LIBRARIES}
+)
+
 
 #############
 ## Install ##
