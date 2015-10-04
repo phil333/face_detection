@@ -6,39 +6,32 @@
 #include <opencv2/highgui/highgui.hpp>
 #include "opencv2/objdetect/objdetect.hpp"
 #include <dynamic_reconfigure/server.h>
-#include <face_det_rec/arFacerecConfig.h>
+#include <face_detection/face_detConfig.h>
 
 #include <iostream>
 #include <stdio.h>
-
 #include <sstream>
 #include <string>
-
 #include <time.h>
 
 
 using namespace std;
 using namespace cv;
 
-
+// OpenCV publishing windows
 static const std::string OPENCV_WINDOW = "Image window";
-//static const std::string OPENCV_WINDOW_2 = "Image window 2";
-static const std::string OPENCV_WINDOW_menu = "Menu";
 
-String face_cascade_name_0 = "include/face_detection/HaarCascades/haarcascade_frontalface_alt.xml";
-String face_cascade_name_1 = "include/face_detection/HaarCascades/haarcascade_frontalface_alt2.xml";
-String face_cascade_name_2 = "include/face_detection/HaarCascades/haarcascade_frontalface_alt_tree.xml";
-String face_cascade_name_3 = "include/face_detection/HaarCascades/haarcascade_frontalface_default.xml";
 
-class ImageConverter
+class FaceDetector
 {
   ros::NodeHandle nh_;
   image_transport::ImageTransport it_;
   image_transport::Subscriber image_sub_;
   image_transport::Publisher image_pub_;
 
-  dynamic_reconfigure::Server<face_detection::arFacerecConfig> srv;
-  dynamic_reconfigure::Server<face_detection::arFacerecConfig>::CallbackType f;
+  // required for the dynamic reconfigure server
+  dynamic_reconfigure::Server<face_detection::face_detConfig> srv;
+  dynamic_reconfigure::Server<face_detection::face_detConfig>::CallbackType f;
 
   int counter;
   int neighborsValue;
@@ -57,12 +50,10 @@ class ImageConverter
   int colourValue;
   int inputSkipp;
   int maxSize;
-  string imageInput = "/ardrone/image_raw";
-  string imageOutput = "/facerec/image_raw";
-
   float totalTime;
   int windowOnOff;
-
+  string imageInput = "/camera/image_raw";
+  string imageOutput = "/face_det/image_raw";
 
   char myflag;
 
@@ -81,6 +72,7 @@ class ImageConverter
   // start and end times
   time_t start, end, timeZero, currentTime;
   ros::Time begin;
+
   // fps calculated using number of frames / seconds
   double fps;
   // frame counter
@@ -93,36 +85,33 @@ class ImageConverter
 
 
 public:
-
-  ImageConverter()
+  FaceDetector(String casc0, String casc1, String casc2, String casc3)
     : it_(nh_)
   {
     inputSkipp = 1;
+
     // Subscrive to input video feed and publish output video feed "/camera/image_raw",
-    image_sub_ = it_.subscribe(imageInput, inputSkipp, &ImageConverter::imageCb, this);
+    image_sub_ = it_.subscribe(imageInput, inputSkipp, &FaceDetector::imageCb, this);
     image_pub_ = it_.advertise(imageOutput, inputSkipp);
 
-
-    if (face_cascade_0.load(face_cascade_name_0) == false) {
+    //loads in the different cascade detection files
+    printf("################\n" );
+    if (face_cascade_0.load(casc0) == false) {
       printf("cascade.load_0() failed...\n");
-      //std::cout << "face_cascade_0: " << face_cascade_name_0;
       }
-    if (face_cascade_1.load(face_cascade_name_1) == false) {
-     /printf("cascade.load_1() failed...\n");
+    if (face_cascade_1.load(casc1) == false) {
+      printf("cascade.load_1() failed...\n");
+
       }
-    if (face_cascade_2.load(face_cascade_name_2) == false) {
+    if (face_cascade_2.load(casc2) == false) {
       printf("cascade.load_2() failed...\n");
+
       }
-    if (face_cascade_3.load(face_cascade_name_3) == false) {
+    if (face_cascade_3.load(casc3) == false) {
       printf("cascade.load_3() failed...\n");
       }
 
-
-
-
-
-
-
+    //windowOnOff = atoi(windowOption.c_str());
 
     counter = 0;
     gFps = 2;
@@ -142,17 +131,14 @@ public:
     flag = 2;
     fps = -1;
     debug = 0;
-
     totalFrameCounter = 0;
     totalTime = 0;
-
     myflag = CV_HAAR_DO_CANNY_PRUNING;
-
     windowOnOff = 0;
     totalDetections = 0;
 
-
-    f = boost::bind(&ImageConverter::callback, this, _1, _2);
+    //setting up the dynamic reconfigure server
+    f = boost::bind(&FaceDetector::callback, this, _1, _2);
     srv.setCallback(f);
 
     //CV_HAAR_DO_CANNY_PRUNING
@@ -160,61 +146,30 @@ public:
     //CV_HAAR_FIND_BIGGEST_OBJECT
     //CV_HAAR_DO_ROUGH_SEARCH
 
-  }
 
-
-  ~ImageConverter()
-  {
-    if(windowOnOff == 1){
-      //cv::destroyWindow(OPENCV_WINDOW);
-      cv::destroyWindow(OPENCV_WINDOW);
-      //cv::destroyWindow(OPENCV_WINDOW_menu);
-    }
-  }
-
-  void update(String casc0, String casc1, String casc2, String casc3, String windowOption)
-  {
-    windowOnOff = atoi(windowOption.c_str());
-
-    printf("################\n" );
-    if (face_cascade_0.load(casc0) == false) {
-      printf("cascade.load_0() failed...\n");
-      }
-    if (face_cascade_1.load(casc1) == false) {
-      printf("cascade.load_1() failed...\n");
-
-      }
-    if (face_cascade_2.load(casc2) == false) {
-      printf("cascade.load_2() failed...\n");
-
-      }
-    if (face_cascade_3.load(casc3) == false) {
-      printf("cascade.load_3() failed...\n");
-
-      }
-    std::cout << "face_cascade_0: " << casc0 << "\n";
-    std::cout << "face_cascade_1: " << casc1 << "\n";
-    std::cout << "face_cascade_2: " << casc2 << "\n";
-    std::cout << "face_cascade_3: " << casc3 << "\n";
-
-
-    if(windowOnOff == 1){
-      //generate windows
+    //generate windows
+    if(debug != 0){
       cv::namedWindow(OPENCV_WINDOW);
-      cv::namedWindow(OPENCV_WINDOW_menu);
-
     }
-
 
   }
 
+  //####################################################################
+  //##################### destroyer ####################################
+  //####################################################################
+  ~FaceDetector()
+  {
+    cv::destroyWindow(OPENCV_WINDOW);
+  }
 
 
-  //called every time theres a new image
+  //####################################################################
+  //############# called every time theres a new image #################
+  //####################################################################
   void imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
 
-    // reset the fps frame counter every once in a while
+    // starts time calculations, one of the counters is being reset every once in a while
     if (frameCounter == 0){
         time(&start);
         if (totalFrameCounter == 0) {
@@ -223,6 +178,8 @@ public:
         }
     }
 
+
+    // retrieves the image from the camera driver
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
@@ -234,13 +191,14 @@ public:
       return;
     }
 
-    //ros::Time begin = ros::Time::now();
-    imgScale = 1.0/imgScaleValue;
-    gCounter += 1;
+
+
 
     //####################################################################
     //image preprocessing
     //####################################################################
+    imgScale = 1.0/imgScaleValue;
+    gCounter += 1;
 
     // change contrast: 0.5 = half  ; 2.0 = double
     cv_ptr->image.convertTo(gray, -1, contrastFactor, 0);
@@ -264,24 +222,25 @@ public:
 
 
     //####################################################################
-    //####################### detection ##################################
+    //####################### detection part #############################
     //####################################################################
 
-    //this part is only excecuted every couple of frames, depending on gFps setting
+    // depending on the gFps setting, this part is only executed every couple of frames
     if(gCounter > gFps -1){
       gCounter = 0;
       face_cascade.detectMultiScale(
-        gray,
-        faces,
-        scaleValue,          // scale factor
-        neighborsValue,            // minimum neighbors
-        0|myflag,            // flags
+        gray,                       // input image (grayscale)
+        faces,                      // output variable containing face rectangle
+        scaleValue,                 // scale factor
+        neighborsValue,             // minimum neighbors
+        0|myflag,                   // flags
         cv::Size(minSize, minSize), // minimum size
-        cv::Size(maxSize, maxSize) // minimum size
+        cv::Size(maxSize, maxSize)  // minimum size
       );
-      //0|myflag,            // flags
+
     }
 
+    //keep number of total detections
     totalDetections += faces.size();
 
     //print faces on top of image
@@ -332,22 +291,20 @@ public:
       }
     // fps counter end
 
-
+    // print out averages
     totalTime = ( ros::Time::now() - begin).toSec();
-
     sec = difftime(end, timeZero);
-    //printf("FPS : %.2f   #   skipped frames : %i   #   Detected faces : %lu  \n",fps, gFps-1,faces.size());
-    //printf("frame: %i, time passed: %.2f, number of detections: %i  \n",totalFrameCounter, sec ,totalDetections );
     printf("time passed: %.2f  #  frames: %i  #  fps: %f  #  total number of detections: %i # FPS in last 100 frames : %.2f \n", totalTime, totalFrameCounter, totalFrameCounter/totalTime, totalDetections, fps);
 
     totalFrameCounter += 1;
     cv::waitKey(3);
   }
 
-  //############################################
-  //########## callback function ###############
-  //############################################
-  void callback(face_det_rec::arFacerecConfig &config, uint32_t level)
+
+  //########################################################
+  //########## reconfigure callback function ###############
+  //########################################################
+  void callback(face_detection::face_detConfig &config, uint32_t level)
   {
 
     ROS_INFO("Reconfigure request");
@@ -407,7 +364,7 @@ public:
 
     if (imageInput != config.imageInput || inputSkipp != config.inputSkipp) {
       imageInput = config.imageInput;
-      image_sub_ = it_.subscribe(imageInput, inputSkipp, &ImageConverter::imageCb, this);
+      image_sub_ = it_.subscribe(imageInput, inputSkipp, &FaceDetector::imageCb, this);
     }
 
     if (imageOutput != config.imageOutput || inputSkipp != config.inputSkipp) {
@@ -418,7 +375,7 @@ public:
   }
 
 
-
+  // check the reconfigure sever
   void callSrv()
   {
     srv.setCallback(f);
@@ -429,12 +386,14 @@ public:
 
 
 
-
+//########################################################
+//##################### Main #############################
+//########################################################
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "image_converter");
   if(argc < 6){
-    printf("You must provide at least 5 arguments (cascade files) plus OnOff window\n");
+    printf("Use the provided Roslaunch file\n");
     exit(0);
   }
 
@@ -443,12 +402,8 @@ int main(int argc, char** argv)
 
   ROS_INFO("Starting to spin...");
 
-
-
-
-  ImageConverter ic;
-  ic.update(argv[1],argv[2],argv[3],argv[4], argv[5]);
-  ic.callSrv();
+  FaceDetector faceDet(argv[1],argv[2],argv[3],argv[4]);
+  faceDet.callSrv();
   ros::spin();
   return 0;
 }

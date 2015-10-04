@@ -75,6 +75,9 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -o0")
 #   DEPENDENCIES
 #   sensor_msgs#   std_msgs
 # )
+generate_dynamic_reconfigure_options(
+  cfg/face_detection.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -88,7 +91,7 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -o0")
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES face_detection
-#  CATKIN_DEPENDS cv_bridge opencv2 roscpp rospy sensor_msgs std_msgs
+   CATKIN_DEPENDS cv_bridge image_transport roscpp rospy sensor_msgs std_msgs dynamic_reconfigure
 #  DEPENDS system_lib
 )
 
