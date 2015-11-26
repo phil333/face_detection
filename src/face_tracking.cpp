@@ -642,11 +642,11 @@ public:
       exit(0);
       }
 
-    if (face_cascade_profile.load("/home/phil/catkin_ws/src/face_detection/include/face_detection//HaarCascades/haarcascade_frontalface_default.xml") == false) {
-      printf("cascade.load_3() failed...\n");
-      printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_default.xml\n");
-      exit(0);
-      }
+    //if (face_cascade_profile.load("/home/phil/catkin_ws/src/face_detection/include/face_detection//HaarCascades/haarcascade_frontalface_default.xml") == false) {
+    //  printf("cascade.load_3() failed...\n");
+    //  printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_default.xml\n");
+    //  exit(0);
+    //  }
     printf("OpenCV: %s \n", cv::getBuildInformation().c_str());
 
     counter = 0;
