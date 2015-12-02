@@ -116,6 +116,7 @@ class FaceDetector
   cv::CascadeClassifier face_cascade_1;
   cv::CascadeClassifier face_cascade_2;
   cv::CascadeClassifier face_cascade_3;
+  cv::CascadeClassifier face_cascade_4;
   std::vector<cv::Rect> faces;
   int gFps;
   int gCounter;
@@ -351,7 +352,7 @@ public:
   //######################################################################
   //##################### constructor ####################################
   //######################################################################
-  FaceDetector(String casc0, String casc1, String casc2, String casc3)
+  FaceDetector(String casc0, String casc1, String casc2, String casc3, String casc4)
     : it_(nh_)
   {
     inputSkipp = 1;
@@ -383,6 +384,12 @@ public:
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_default.xml\n");
       exit(0);
       }
+    if (face_cascade_4.load(casc4) == false) {
+      printf("cascade.load_4() failed...\n");
+      printf("The missing cascade file is /include/face_detection/lbpCascades/lbpcascade_frontalface.xml\n");
+      exit(0);
+      }
+
     printf("OpenCV: %s \n", cv::getBuildInformation().c_str());
 
     counter = 0;
@@ -496,6 +503,9 @@ public:
       case 3:
         face_cascade = face_cascade_3;
         break;
+      case 4:
+        face_cascade = face_cascade_3;
+        break;
       default:
         face_cascade = face_cascade_0;
         break;
@@ -537,14 +547,15 @@ int main(int argc, char** argv)
   printf("############ ROS Face Detection ##############\n");
   printf("##############################################\n");
   printf("\n");
-  if(argc < 5){
+  if(argc < 6){
     printf("Not Enough arguments, use one of the provided Roslaunch files\n");
     printf("\n");
     printf("Alternatively, arguments are needed as follows:\n");
-    printf("01) Detection Cascade file 1\n");
-    printf("02) Detection Cascade file 2\n");
-    printf("03) Detection Cascade file 3\n");
-    printf("04) Detection Cascade file 4\n");
+    printf("01) Detection Cascade file 0\n");
+    printf("02) Detection Cascade file 1\n");
+    printf("03) Detection Cascade file 2\n");
+    printf("04) Detection Cascade file 3\n");
+    printf("05) Detection Cascade file 4\n");
     printf("\n");
     printf("\n");
     exit(0);
@@ -557,7 +568,7 @@ int main(int argc, char** argv)
 
   ROS_INFO("Starting to spin...");
 
-  FaceDetector faceDet(argv[1],argv[2],argv[3],argv[4]);
+  FaceDetector faceDet(argv[1],argv[2],argv[3],argv[4],argv[5]);
   faceDet.callSrv();
   ros::spin();
   return 0;
