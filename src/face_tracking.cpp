@@ -54,6 +54,7 @@
 #include "std_msgs/Int32MultiArray.h"
 
 #include <iostream>
+#include <queue>
 #include <stdio.h>
 #include <sstream>
 #include <string>
@@ -113,8 +114,16 @@ class FaceDetector
   int maxNumFeatures;
   int trackSearchWinSize;
   int IDcounter;
+  int fpsWindowSize;
+
+
+
+
   string imageInput = "/camera/image_raw";
   string imageOutput = "/face_det/image_raw";
+
+  struct timeval tinit_time;
+  queue <timeval> fpsTimeQueue;
 
   char myflag;
 
@@ -147,7 +156,6 @@ class FaceDetector
   // fps calculated using number of frames / seconds
   double fps;
   // frame counter
-  int frameCounter;
   int totalFrameCounter;
   // floating point seconds elapsed since start
   double sec;
@@ -161,16 +169,9 @@ private:
     {
 
       // starts time calculations, one of the counters is being reset every once in a while
-      if (frameCounter == 0){
-          time(&start);
-          if (totalFrameCounter == 0) {
-              time(&timeZero);
-              begin = ros::Time::now();
-
-
-
-          }
-      }
+      struct timeval tstart, tend;
+      gettimeofday(&tstart, NULL);
+      fpsTimeQueue.push(tstart);
 
 
       // retrieves the image from the camera driver
@@ -186,7 +187,8 @@ private:
       }
 
       if (totalFrameCounter == 0) {
-
+          gettimeofday(&tinit_time, NULL);
+          begin = ros::Time::now();
           previousFrame = cv_ptr->image;
           cvtColor( previousFrame, previousFrame, CV_BGR2GRAY );
 
@@ -229,7 +231,6 @@ private:
       //####################### detection part #############################
       //####################################################################
       // depending on the gFps setting, this part is only executed every couple of frames
-
       std::vector<cv::Rect> newFaces;
       if(gCounter > gFps -1){
         //gCounter = 0;
@@ -273,9 +274,8 @@ private:
       //####################################################################
       //####################### tracking part ##############################
       //####################################################################
-      //
+      // tracking the featres between the previeous and the current frame
       Mat croppedImage;
-
       int mx;
       int my;
       int mh;
@@ -396,11 +396,8 @@ private:
                         //printf("instersection %d %d %d %d\n", interSection.x,interSection.y,interSection.width,interSection.height);
                         faces[j] = newFaces[i];
                         lastSeen[j] = maxTrackingNum;
-                  } //else {
-                        // we have no intersection
-                        //printf("no instersection %d %d %d %d\n", interSection.x,interSection.y,interSection.width,interSection.height);
-                        //faces[j] = newFaces[i];
-                  //}
+                        break;
+                  }
 
               }
 
@@ -410,6 +407,7 @@ private:
                   faceID.push_back(IDcounter);
                   IDcounter++;
                   detectionLength.push_back(1);
+
               }
           }
 
@@ -510,22 +508,33 @@ private:
       }
 
 
-      // fps counter begin
-      time(&end);
-      frameCounter++;
-      if (frameCounter > 100){
-          sec = difftime(end, start);
-          fps = frameCounter/sec;
-          //printf("%.2f fps\n", fps);
-          //printf("%.2f fps   ; sec = %.2f ; counter = %i \n", fps, sec,frameCounter);
-          frameCounter = 0;
-        }
-      // fps counter end
 
-      // print out averages
+
+      //measure time in milisec
+      long mtime, seconds, useconds;
+
+      //measure fps since beginning
+      gettimeofday(&tend, NULL);
+      seconds  = tend.tv_sec  - tinit_time.tv_sec;
+      useconds = tend.tv_usec - tinit_time.tv_usec;
+      mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+      double fpsTotal =  float(totalFrameCounter) / (float(mtime)/1000);
+
+      // measure fps for last 10 frames
+      gettimeofday(&tend, NULL);
+      seconds  = tend.tv_sec  - fpsTimeQueue.front().tv_sec;
+      useconds = tend.tv_usec - fpsTimeQueue.front().tv_usec;
+      mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+      fps =  float(10) / (float(mtime)/1000);
+
+      fpsTimeQueue.pop();
+
       totalTime = ( ros::Time::now() - begin).toSec();
-      sec = difftime(end, timeZero);
-      printf("time passed: %.2f  #  frames: %i  #  fps: %f  \n#  total number of detections: %i # FPS in last 100 frames : %.2f \n", totalTime, totalFrameCounter, totalFrameCounter/totalTime, totalDetections, fps);
+      // print out averages
+      printf("time passed: %.2f  #  frames: %i  #  fps: %f  \n#  total number of detections: %i # FPS in last 10 frames : %.2f \n", totalTime, totalFrameCounter, fpsTotal, totalDetections, fps);
+
+
+
 
       totalFrameCounter += 1;
       cv::waitKey(3);
@@ -597,11 +606,18 @@ private:
             cv::putText(myImage, std::to_string(faceID[i]), cv::Point(faces[i].x,faces[i].y+faces[i].height+20), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
 
         }
+
+        // display fps
+        string fpsText = "FPS: " + std::to_string((int)fps);
+        cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
+
         return myImage;
     }
 
 
 public:
+
+
 
   //######################################################################
   //##################### constructor ####################################
@@ -674,7 +690,6 @@ public:
     blurFactor = 0;
     brightnessFactor = 0;
     button1 = 0;
-    frameCounter = 0;
     contrastFactor = 1.5;
     flag = 2;
     fps = -1;
@@ -690,6 +705,13 @@ public:
     pixelSwitch = 1;
     trackSearchWinSize = 100;
     IDcounter = 1;
+    fpsWindowSize = 10;
+
+    //init fps Window Queue
+    for (int i = 0;i < (fpsWindowSize);i++) {
+        struct timeval now;
+        fpsTimeQueue.push(now);
+    }
 
     //setNumThreads(0);
 
