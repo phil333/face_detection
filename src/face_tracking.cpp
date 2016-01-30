@@ -115,6 +115,7 @@ class FaceDetector
   int trackSearchWinSize;
   int IDcounter;
   int fpsWindowSize;
+  int publish;
 
 
 
@@ -242,8 +243,8 @@ private:
           scaleValue,                 // scale factor
           neighborsValue,             // minimum neighbors
           0|myflag,                   // flags
-          cv::Size(minSize, minSize), // minimum size
-          cv::Size(maxSize, maxSize)  // minimum size
+          cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
+          cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
         );
 
         /* printf("this\n" );
@@ -310,11 +311,9 @@ private:
         for (unsigned j = 0; j < features_prev.size(); j++) {
             features_prev[j].x = features_prev[j].x + mx;
             features_prev[j].y = features_prev[j].y + my;
-            if(pixelSwitch == 0){
+            if(pixelSwitch == 0 && debug ==3){
                 cv::circle(cv_ptr->image, cv::Point(features_prev[j].x , features_prev[j].y), 1, CV_RGB(255,0,0),CV_FILLED);
             }
-
-
         }
 
         //printf("Optical Flow \n");
@@ -340,7 +339,7 @@ private:
         // add mx my to the values of the cropped window
         // then calc error rate
         for (unsigned j = 0; j < features_next.size(); j++) {
-            if(pixelSwitch == 0){
+            if(pixelSwitch == 0 && debug ==3){
                 cv::circle(cv_ptr->image, cv::Point(features_next[j].x , features_next[j].y), 1, CV_RGB(255,255,255),CV_FILLED);
             }
             mvRateX += features_next[j].x - features_prev[j].x;
@@ -350,7 +349,7 @@ private:
         mvRateX = mvRateX /features_next.size();
         mvRateY = mvRateY /features_next.size();
 
-        if(pixelSwitch == 0){
+        if(pixelSwitch == 0 && debug ==3){
             cv::circle(cv_ptr->image, cv::Point(mx + mw/2, my + mh/2), 10, CV_RGB(0,255,0));
             cv::circle(cv_ptr->image, cv::Point(mx + mw/2 + mvRateX, my + mh/2 +mvRateY), 10, CV_RGB(255,0,0));
         }
@@ -476,35 +475,39 @@ private:
       }
 
 
+      //publishing
+      if(publish != 0 ){
 
-      if(debug != 3){
           // Output modified video stream
-          image_pub_.publish(cv_ptr->toImageMsg());
-          //image_pub_.publish(cv_ptr->toImageMsg());
-          //ros::NodeHandle n;
-          //
+
+          if(publish == 1 || publish == 3){
+              image_pub_.publish(cv_ptr->toImageMsg());
+          }
+
 
           // ### publishing coordinates ###
-          std_msgs::Int32MultiArray myMsg;
-          myMsg.data.clear();
-          // publish current fps rate
-          myMsg.data.push_back(fps);
-          // publish number of detected faces
-          myMsg.data.push_back(faces.size());
-          // width of the image
-          myMsg.data.push_back(cv_ptr->image.cols);
-          // height of the image
-          myMsg.data.push_back(cv_ptr->image.rows);
-          //for (i = faces.begin(); i != faces.end(); ++i) {
-          for ( unsigned i = 0; i < faces.size(); i++) {
-              myMsg.data.push_back(faceID[i]);
-              myMsg.data.push_back(detectionLength[i]);
-              myMsg.data.push_back(faces[i].x);
-              myMsg.data.push_back(faces[i].y);
-              myMsg.data.push_back(faces[i].width);
-              myMsg.data.push_back(faces[i].height);
+          if(publish > 1){
+              std_msgs::Int32MultiArray myMsg;
+              myMsg.data.clear();
+              // publish current fps rate
+              myMsg.data.push_back(fps);
+              // publish number of detected faces
+              myMsg.data.push_back(faces.size());
+              // width of the image
+              myMsg.data.push_back(cv_ptr->image.cols);
+              // height of the image
+              myMsg.data.push_back(cv_ptr->image.rows);
+              //for (i = faces.begin(); i != faces.end(); ++i) {
+              for ( unsigned i = 0; i < faces.size(); i++) {
+                  myMsg.data.push_back(faceID[i]);
+                  myMsg.data.push_back(detectionLength[i]);
+                  myMsg.data.push_back(faces[i].x);
+                  myMsg.data.push_back(faces[i].y);
+                  myMsg.data.push_back(faces[i].width);
+                  myMsg.data.push_back(faces[i].height);
+              }
+              faceCoord_pub.publish(myMsg);
           }
-          faceCoord_pub.publish(myMsg);
       }
 
 
@@ -574,8 +577,42 @@ private:
     //cv_bridge::CvImagePtr drawFaces(cv_bridge::CvImagePtr myImagePtr) {
     cv::Mat drawFaces(cv::Mat myImage) {
 
+
+        if(debug ==3){
+
+            //draw min/max detection box size
+            cv::rectangle(
+              myImage,
+              cv::Point(0, 0),
+              cv::Point(minSize, minSize),
+              CV_RGB(255, 50 , 50),
+              2);
+            cv::rectangle(
+              myImage,
+              cv::Point(0, 0),
+              cv::Point(maxSize, maxSize),
+              CV_RGB(255, 50 , 50),
+              2);
+            cv::rectangle(
+              myImage,
+              cv::Point(0, maxSize),
+              cv::Point(maxSize+1, maxSize+20),
+              CV_RGB(255, 50 , 50),
+              CV_FILLED);
+            cv::putText(myImage, "min/max size", cv::Point(5, maxSize+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+
+            //draw fps numbers
+            string fpsText = "FPS: " + std::to_string((int)fps);
+            cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
+
+        }
+
+
+
         for (unsigned i = 0; i < faces.size(); ++i) {
             //printf("last seen %d \n", lastSeen[i]);
+            int boxSize = 25;
+            if(faceID[i] > 99){boxSize = 36;}
             if(lastSeen[i] == (maxTrackingNum -1) ){
                 // green = newly detected
                 //printf("seen \n");
@@ -585,6 +622,13 @@ private:
                   cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
                   CV_RGB(50, 255 , 50),
                   2);
+
+                cv::rectangle(
+                  myImage,
+                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
+                  CV_RGB(50, 255 , 50),
+                  CV_FILLED);
             } else if(lastSeen[i] != 1) {
                 // blue = old face
                 cv::rectangle(
@@ -593,6 +637,12 @@ private:
                   cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
                   CV_RGB(50, 50 , 255),
                   2);
+                cv::rectangle(
+                  myImage,
+                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
+                  CV_RGB(50, 50 , 255),
+                  CV_FILLED);
             } else {
                 // red = about to disappear
                 cv::rectangle(
@@ -601,15 +651,21 @@ private:
                   cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
                   CV_RGB(255, 50 , 50),
                   2);
+
+                cv::rectangle(
+                  myImage,
+                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
+                  CV_RGB(255, 50 , 50),
+                  CV_FILLED);
             }
 
-            cv::putText(myImage, std::to_string(faceID[i]), cv::Point(faces[i].x,faces[i].y+faces[i].height+20), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+            cv::putText(myImage, std::to_string(faceID[i]), cv::Point(faces[i].x+1,faces[i].y+faces[i].height+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+
+
 
         }
 
-        // display fps
-        string fpsText = "FPS: " + std::to_string((int)fps);
-        cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
 
         return myImage;
     }
@@ -706,6 +762,7 @@ public:
     trackSearchWinSize = 100;
     IDcounter = 1;
     fpsWindowSize = 10;
+    publish = 1;
 
     //init fps Window Queue
     for (int i = 0;i < (fpsWindowSize);i++) {
@@ -747,7 +804,7 @@ public:
     ROS_INFO("Reconfigure request");
 
 
-    if (config.debug == 0 && debug > 0) {
+    if (config.displayed_Image == 0 && debug > 0) {
       cv::destroyWindow(OPENCV_WINDOW);
     }
 
@@ -763,13 +820,17 @@ public:
     blurFactor = config.blurFactor;
     brightnessFactor = config.brightnessFactor;
     contrastFactor = config.contrastFactor;
-    debug = config.debug;
+    debug = config.displayed_Image;
     inputSkipp = config.inputSkipp;
     pixelSwitch = config.pixelSwitch;
     maxNumFeatures = config.maxNumFeatures;
     maxTrackingNum = config.maxTrackingNum;
     initialDetectionNum = config.initialDetectionNum;
     trackSearchWinSize = config.trackSearchWinSize;
+    publish = config.publish;
+
+
+
     //selecting the correct flag for the
     switch(config.myflag){
       case 0 :
