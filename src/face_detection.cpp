@@ -108,7 +108,7 @@ class FaceDetector
   int windowOnOff;
   int pixelSwitch;
   int fpsWindowSize;
-
+  int publish;
 
   string imageInput = "/camera/image_raw";
   string imageOutput = "/face_det/image_raw";
@@ -217,8 +217,8 @@ private:
           scaleValue,                 // scale factor
           neighborsValue,             // minimum neighbors
           0|myflag,                   // flags
-          cv::Size(minSize, minSize), // minimum size
-          cv::Size(maxSize, maxSize)  // minimum size
+          cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
+          cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
         );
 
       }
@@ -246,7 +246,7 @@ private:
 
       //Display Section, images will only displayed if option is selected
       if(debug != 0){
-        if(debug == 1){
+        if(debug == 1 || debug == 3 ){
           cv::imshow(OPENCV_WINDOW, cv_ptr->image);
         }
         else if(debug == 2){
@@ -265,32 +265,42 @@ private:
       }
 
 
-      // ### publishing coordinates ###
-      std_msgs::Int32MultiArray myMsg;
-      myMsg.data.clear();
-      // publish current fps rate
-      myMsg.data.push_back(fps);
-      // publish number of detected faces
-      myMsg.data.push_back(faces.size());
-      // width of the image
-      myMsg.data.push_back(cv_ptr->image.cols);
-      // height of the image
-      myMsg.data.push_back(cv_ptr->image.rows);
-      //for (i = faces.begin(); i != faces.end(); ++i) {
-      for ( unsigned i = 0; i < faces.size(); i++) {
-          myMsg.data.push_back(1);
-          myMsg.data.push_back(1);
-          myMsg.data.push_back(faces[i].x);
-          myMsg.data.push_back(faces[i].y);
-          myMsg.data.push_back(faces[i].width);
-          myMsg.data.push_back(faces[i].height);
+
+      //publishing
+      if(publish != 0 ){
+        // Output modified video stream
+
+        if(publish == 1 || publish == 3){
+            image_pub_.publish(cv_ptr->toImageMsg());
+        }
+
+
+        // ### publishing coordinates ###
+        if(publish > 1){
+          std_msgs::Int32MultiArray myMsg;
+          myMsg.data.clear();
+          // publish current fps rate
+          myMsg.data.push_back(fps);
+          // publish number of detected faces
+          myMsg.data.push_back(faces.size());
+          // width of the image
+          myMsg.data.push_back(cv_ptr->image.cols);
+          // height of the image
+          myMsg.data.push_back(cv_ptr->image.rows);
+          //for (i = faces.begin(); i != faces.end(); ++i) {
+          for ( unsigned i = 0; i < faces.size(); i++) {
+              myMsg.data.push_back(1);
+              myMsg.data.push_back(1);
+              myMsg.data.push_back(faces[i].x);
+              myMsg.data.push_back(faces[i].y);
+              myMsg.data.push_back(faces[i].width);
+              myMsg.data.push_back(faces[i].height);
+          }
+          faceCoord_pub.publish(myMsg);
+        }
+
       }
-      faceCoord_pub.publish(myMsg);
 
-
-
-      // Output modified video stream
-      image_pub_.publish(cv_ptr->toImageMsg());
 
 
       //measure time in milisec
@@ -358,10 +368,33 @@ private:
               CV_RGB(50, 255 , 50),
               2);
         }
-        // display fps
-        string fpsText = "FPS: " + std::to_string((int)fps);
-        cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
 
+        if(debug ==3){
+          //draw min/max detection box size
+          cv::rectangle(
+            myImage,
+            cv::Point(0, 0),
+            cv::Point(minSize, minSize),
+            CV_RGB(255, 50 , 50),
+            2);
+          cv::rectangle(
+            myImage,
+            cv::Point(0, 0),
+            cv::Point(maxSize, maxSize),
+            CV_RGB(255, 50 , 50),
+            2);
+          cv::rectangle(
+            myImage,
+            cv::Point(0, maxSize),
+            cv::Point(maxSize+1, maxSize+20),
+            CV_RGB(255, 50 , 50),
+            CV_FILLED);
+          cv::putText(myImage, "min/max size", cv::Point(5, maxSize+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+
+          // display fps
+          string fpsText = "FPS: " + std::to_string((int)fps);
+          cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
+        }
 
         return myImage;
     }
@@ -480,7 +513,7 @@ public:
     ROS_INFO("Reconfigure request");
 
 
-    if (config.debug == 0 && debug > 0) {
+    if (config.displayed_Image == 0 && debug > 0) {
       cv::destroyWindow(OPENCV_WINDOW);
     }
 
@@ -488,17 +521,18 @@ public:
     neighborsValue = config.neighborsValue;
     scaleValue = config.scaleValue;
 
-    minSize = config.minSize/scaleValue;
-    maxSize = config.maxSize/scaleValue;
+    minSize = config.minSize;
+    maxSize = config.maxSize;
     cascadeValue = config.cascadeValue;
     imgScale = config.imgScale;
     histOnOff = config.histOnOff;
     blurFactor = config.blurFactor;
     brightnessFactor = config.brightnessFactor;
     contrastFactor = config.contrastFactor;
-    debug = config.debug;
+    debug = config.displayed_Image;
     inputSkipp = config.inputSkipp;
     pixelSwitch = config.pixelSwitch;
+    publish = config.publish;
 
 
     //selecting the correct flag for the

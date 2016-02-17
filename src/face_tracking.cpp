@@ -246,7 +246,8 @@ private:
           cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
           cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
         );
-
+        printf("min %d max %d\n",minSize, maxSize );
+        printf("minb %f maxb %f\n",minSize*imgScale, maxSize*imgScale );
         /* printf("this\n" );
         } else {
         face_cascade_profile.detectMultiScale(
@@ -812,8 +813,8 @@ public:
     neighborsValue = config.neighborsValue;
     scaleValue = config.scaleValue;
 
-    minSize = config.minSize/scaleValue;
-    maxSize = config.maxSize/scaleValue;
+    minSize = config.minSize;
+    maxSize = config.maxSize;
     cascadeValue = config.cascadeValue;
     imgScale = config.imgScale;
     histOnOff = config.histOnOff;
