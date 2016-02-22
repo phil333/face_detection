@@ -18,7 +18,7 @@ in a timely manner.
   - CMakeLists.txt:       CMake project configuration file
   - LICENSES:             license agreement
   - package.xml:          ROS/Catkin package file
-  - README.txt:            this file
+  - README.txt:           this file
 
 
 **Why use this package:**
@@ -43,6 +43,27 @@ Once you have the rqt_reconfigure open, change the input image default
 (/camera/image_raw) to your desired input. Additional information about the
 different settings are annotated in the dynamic reconfigure setup (hover over
 the setting in the rqt_reconfigure for additional information)
+
+**Dlib:**
+Since it is uncommon to have Dlib installed, the face_detection_dlib node is
+disabled by default. The Dlib face detection system has a higher accuracy to
+detect faces, especially faces which are tilted sideways. The system is a bit
+slower than OpenCV, mainly because of the lack of additional configuration
+settings (min max searchwindow_scale ...). It also has a lower accuracy with
+smaller faces. The detection is using a HOG cascade.
+
+If you want to use this node, you need to enable it in the CMakeLists file under
+the section "DLIB". You will also need to link the installation directory in the
+CMakeLists (include(../dlib/cmake)). The Dlib library can be found on their
+website (http://dlib.net/). If your CPU does not support the AVX instruction
+set, you might have to change the line "#set(USE_AVX_INSTRUCTIONS 1)"
+
+The node can be launched with:
+  - roslaunch face_detection face_detection.launch
+
+Settings can be changed with:
+  - rosrun rqt_reconfigure rqt_reconfigure
+
 
 **Requirements:**
 This node was designed for ROS Indigo and requires a catkin workspace. The node
