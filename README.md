@@ -22,16 +22,23 @@ in a timely manner.
 
 
 **Why use this package:**
+
 These ROS nodes are designed to detect and track faces in images coming from a
 ROS image topic. The nodes display or publish an image with the resulting
 detections drawn on top of the image. The settings of the detection system can
 be easily adapted using ROS rqt_reconfigure (rosrun rqt_reconfigure
-rqt_reconfigure). The nodes also publish the coordinates of the faces.
+rqt_reconfigure). The nodes also publish the coordinates of the faces. To work for a wide variaty of secnarios, the following features are included:
+  - OpenCV Face Detection
+  - Dlib Face Detection
+  - OpenCV CUDA support
+  - OpenCV tracking (Optical flow)
 
 **How to Use this package:**
+
 To run the package, use the provided RosLaunch file as follows:
   - roslaunch face_detection face_detection.launch
   - roslaunch face_detection face_tracking.launch
+  - roslaunch face_detection face_detection_cuda.launch
 
 To see the coordinates published by the nodes, launch the listener node:
   - rosrun face_detection face_listener
@@ -45,6 +52,7 @@ different settings are annotated in the dynamic reconfigure setup (hover over
 the setting in the rqt_reconfigure for additional information)
 
 **Dlib:**
+
 Since it is uncommon to have Dlib installed, the face_detection_dlib node is
 disabled by default. The Dlib face detection system has a higher accuracy to
 detect faces, especially faces which are tilted sideways. The system is a bit
@@ -64,8 +72,13 @@ The node can be launched with:
 Settings can be changed with:
   - rosrun rqt_reconfigure rqt_reconfigure
 
+**OpenCV CUDA:**
+
+To enable faster detection, CUDA support has been enabled for the detection process. Keep in mind that the CUDA detection is slightly different to the original OpenCV detection and will deliver different, slightly less accurate results. Currently only the detection process has been implemented for CUDA. The tracking part is still under development.
+
 
 **Requirements:**
+
 This node was designed for ROS Indigo and requires a catkin workspace. The node
 also makes use of OpenCV. The node has been tested under OpenCV 2.4.8 and 3.0.0.
 To be able to get your images into the node, you will need to ROS Vision_OpenCV
@@ -75,6 +88,7 @@ ROS, like for example ueye_cam (http://wiki.ros.org/ueye_cam) or usb_cam
 (http://wiki.ros.org/usb_cam).
 
 **Multi-threading:**
+
 In order to get the best performance out of the detection, you should compile
 your OpenCV package with Multi-threading support. OpenCV makes use of TBB
 (WITH_TBB=ON)to to enable Multi-threading, for both versions 2.4 and 3.0. Here
@@ -87,6 +101,7 @@ Multi-threading support, but especially the Face_Tracking node will run
 considerably slower.
 
 **Future plans:**
+
 This package is currently still under development and will be updated
 continuously. Please report any problems or desired features, feedback is
 always welcome.
