@@ -27,7 +27,7 @@ These ROS nodes are designed to detect and track faces in images coming from a
 ROS image topic. The nodes display or publish an image with the resulting
 detections drawn on top of the image. The settings of the detection system can
 be easily adapted using ROS rqt_reconfigure (rosrun rqt_reconfigure
-rqt_reconfigure). The nodes also publish the coordinates of the faces. To work for a wide variaty of secnarios, the following features are included:
+rqt_reconfigure). The nodes also publish the coordinates of the faces. To work for a wide variaty of scenarios, the following features are included:
   - OpenCV Face Detection
   - Dlib Face Detection
   - OpenCV CUDA support
