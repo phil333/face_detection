@@ -67,7 +67,7 @@ website (http://dlib.net/). If your CPU does not support the AVX instruction
 set, you might have to change the line "#set(USE_AVX_INSTRUCTIONS 1)"
 
 The node can be launched with:
-  - roslaunch face_detection face_detection.launch
+  - roslaunch face_detection face_detection_dlib.launch
 
 Settings can be changed with:
   - rosrun rqt_reconfigure rqt_reconfigure
