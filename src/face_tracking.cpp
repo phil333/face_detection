@@ -364,7 +364,7 @@ private:
       //################### find intersection  #############################
       //####################################################################
       // here we compare the tracked faces against the newly detected faces:
-      // if we have an intersection, the tracked faces is udated with a new detection
+      // if we have an intersection, the tracked faces is updated with a new detection
       // if we have no intersection, the new detection is added to the current faces
       if(gCounter > gFps -1){
           gCounter = 0;
@@ -527,13 +527,10 @@ private:
       totalTime = ( ros::Time::now() - begin).toSec();
 
       // print out monitoring values
-      printf("time passed: %.2f  #  frames: %i  #  fps: %f  \n#  total number of detections: %i # FPS in last 10 frames : %.2f \n", totalTime, totalFrameCounter, fpsTotal, totalDetections, fps);
+      //printf("time passed: %.2f  #  frames: %i  #  fps: %f  \n#  total number of detections: %i # FPS in last 10 frames : %.2f \n", totalTime, totalFrameCounter, fpsTotal, totalDetections, fps);
 
       totalFrameCounter += 1;
       cv::waitKey(3);
-
-
-
     }
 
     // #########################################
@@ -710,6 +707,8 @@ public:
     maxNumFeatures = 15;
     maxTrackingNum = 60;
 
+    // skips images on detection
+    gFps = 2;
 
     // counting variables
     counter = 0;
@@ -732,13 +731,6 @@ public:
 
     // determines what is published
     publish = 1;
-
-    // skips images on detection
-    gFps = 2;
-
-
-
-
 
     // defines if images are skipped when not all of them can be processed in time;
     inputSkipp = 1;
