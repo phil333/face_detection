@@ -141,7 +141,7 @@ include_directories(
 # add_executable(face_detection_node src/face_detection_node.cpp)
 add_executable(face_detection src/face_detection.cpp)
 
-add_executable(face_detection_cuda src/face_detection_cuda.cpp)
+#add_executable(face_detection_cuda src/face_detection_cuda.cpp)
 add_executable(face_tracking src/face_tracking.cpp)
 #add_executable(face_tracking_cuda src/face_tracking_cuda.cpp)
 add_executable(face_listener src/face_listener.cpp)
@@ -152,7 +152,7 @@ add_executable(face_listener src/face_listener.cpp)
 add_dependencies(face_detection ${PROJECT_NAME}_gencfg)
 add_dependencies(face_tracking ${PROJECT_NAME}_gencfg)
 # add_dependencies(face_detection_node face_detection_generate_messages_cpp)
-add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
+#add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
 #add_dependencies(face_tracking_cuda ${PROJECT_NAME}_gencfg)
 
 
@@ -163,9 +163,9 @@ add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
 target_link_libraries(face_detection
    ${catkin_LIBRARIES}
 )
-target_link_libraries(face_detection_cuda
-   ${catkin_LIBRARIES}
-)
+#target_link_libraries(face_detection_cuda
+#   ${catkin_LIBRARIES}
+#)
 target_link_libraries(face_tracking
    ${catkin_LIBRARIES}
 )
