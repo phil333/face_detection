@@ -20,6 +20,8 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 )
 
+find_package(OpenCV REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -o0")
@@ -162,18 +164,21 @@ add_dependencies(face_tracking ${PROJECT_NAME}_gencfg)
 # )
 target_link_libraries(face_detection
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBS}
 )
 #target_link_libraries(face_detection_cuda
 #   ${catkin_LIBRARIES}
 #)
 target_link_libraries(face_tracking
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBS}
 )
 #target_link_libraries(face_tracking_cuda
 #   ${catkin_LIBRARIES}
 #)
 target_link_libraries(face_listener
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBS}
 )
 
 

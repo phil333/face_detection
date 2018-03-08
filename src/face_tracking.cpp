@@ -41,6 +41,7 @@
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
+#include <std_msgs/Bool.h>
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -86,6 +87,7 @@ class FaceDetector
   image_transport::Subscriber image_sub_;
   image_transport::Publisher image_pub_;
   ros::Publisher faceCoord_pub;
+  ros::Subscriber command_sub;
 
   // required for the dynamic reconfigure server
   dynamic_reconfigure::Server<face_detection::face_trackConfig> srv;
@@ -153,22 +155,25 @@ class FaceDetector
   Mat gray;
 
   // timing variables
-  ros::Time begin;
   int totalFrameCounter;
   double fps;
   double sec;
   float totalTime;
   struct timeval tinit_time;
   queue <timeval> fpsTimeQueue;
+  ros::Time begin;
+  bool tracking_condition;
 
 private:
 
-    //####################################################################
-    //############# called every time theres a new image #################
-    //####################################################################
-    void newImageCallBack(const sensor_msgs::ImageConstPtr& msg)
-    {
+  //####################################################################
+  //############# called every time theres a new image #################
+  //####################################################################
+  void newImageCallBack(const sensor_msgs::ImageConstPtr& msg)
+  {
 
+    if(tracking_condition == true)
+    {
       // starts time calculations
       struct timeval tstart, tend;
       gettimeofday(&tstart, NULL);
@@ -191,10 +196,10 @@ private:
 
       // run only on the first frame
       if (totalFrameCounter == 0) {
-          gettimeofday(&tinit_time, NULL);
-          begin = ros::Time::now();
-          previousFrame = cv_ptr->image;
-          cvtColor( previousFrame, previousFrame, CV_BGR2GRAY );
+        gettimeofday(&tinit_time, NULL);
+        begin = ros::Time::now();
+        previousFrame = cv_ptr->image;
+        cvtColor( previousFrame, previousFrame, CV_BGR2GRAY );
       }
 
       //####################################################################
@@ -235,24 +240,24 @@ private:
       if(gCounter > gFps -1){
 
         face_cascade.detectMultiScale(
-          gray,                       // input image (grayscale)
-          newFaces,                      // output variable containing face rectangle
-          scaleValue,                 // scale factor
-          neighborsValue,             // minimum neighbors
-          0|myflag,                   // flags
-          cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
-          cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
-        );
+              gray,                       // input image (grayscale)
+              newFaces,                      // output variable containing face rectangle
+              scaleValue,                 // scale factor
+              neighborsValue,             // minimum neighbors
+              0|myflag,                   // flags
+              cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
+              cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
+              );
 
         //printf("min %d max %d\n",minSize, maxSize );
         //printf("min_scale %f max_scale %f\n",minSize*imgScale, maxSize*imgScale );
 
         if(imgScale != 1){
           for(unsigned i = 0; i < newFaces.size(); ++i) {
-              newFaces[i].x = newFaces[i].x/imgScale;
-              newFaces[i].y = newFaces[i].y/imgScale;
-              newFaces[i].width = newFaces[i].width/imgScale;
-              newFaces[i].height = newFaces[i].height/imgScale;
+            newFaces[i].x = newFaces[i].x/imgScale;
+            newFaces[i].y = newFaces[i].y/imgScale;
+            newFaces[i].width = newFaces[i].width/imgScale;
+            newFaces[i].height = newFaces[i].height/imgScale;
           }
         }
       }
@@ -289,20 +294,20 @@ private:
         // ###############################################################
         croppedImage = inputImage(Rect(mx,my, mw,mh));
         cv::goodFeaturesToTrack(croppedImage, // the image
-          features_prev,   // the output detected features
-          maxNumFeatures,  // the maximum number of features
-          0.4,     // quality level
-          2     // min distance between two features
-        );
+                                features_prev,   // the output detected features
+                                maxNumFeatures,  // the maximum number of features
+                                0.4,     // quality level
+                                2     // min distance between two features
+                                );
 
 
         // correct coordinates for cropping operation
         for (unsigned j = 0; j < features_prev.size(); j++) {
-            features_prev[j].x = features_prev[j].x + mx;
-            features_prev[j].y = features_prev[j].y + my;
-            if(pixelSwitch == 0 && debug ==3){
-                cv::circle(cv_ptr->image, cv::Point(features_prev[j].x , features_prev[j].y), 1, CV_RGB(255,0,0),CV_FILLED);
-            }
+          features_prev[j].x = features_prev[j].x + mx;
+          features_prev[j].y = features_prev[j].y + my;
+          if(pixelSwitch == 0 && debug ==3){
+            cv::circle(cv_ptr->image, cv::Point(features_prev[j].x , features_prev[j].y), 1, CV_RGB(255,0,0),CV_FILLED);
+          }
         }
 
 
@@ -311,14 +316,14 @@ private:
         // #############################################################
         cv::Size winSize(trackSearchWinSize,trackSearchWinSize);
         if(features_prev.size() != 0){
-            cv::calcOpticalFlowPyrLK(
-              previousFrame, inputImage, // 2 consecutive images
-              features_prev, // input point positions in first im
-              features_next, // output point positions in the 2nd
-              status,    // tracking success
-              err,      // tracking error
-              winSize
-            );
+          cv::calcOpticalFlowPyrLK(
+                previousFrame, inputImage, // 2 consecutive images
+                features_prev, // input point positions in first im
+                features_next, // output point positions in the 2nd
+                status,    // tracking success
+                err,      // tracking error
+                winSize
+                );
         }
 
 
@@ -326,19 +331,19 @@ private:
         // calc error rate
         // #######################################################
         for (unsigned j = 0; j < features_next.size(); j++) {
-            if(pixelSwitch == 0 && debug ==3){
-                cv::circle(cv_ptr->image, cv::Point(features_next[j].x , features_next[j].y), 1, CV_RGB(255,255,255),CV_FILLED);
-            }
-            mvRateX += features_next[j].x - features_prev[j].x;
-            mvRateY += features_next[j].y - features_prev[j].y;
+          if(pixelSwitch == 0 && debug ==3){
+            cv::circle(cv_ptr->image, cv::Point(features_next[j].x , features_next[j].y), 1, CV_RGB(255,255,255),CV_FILLED);
+          }
+          mvRateX += features_next[j].x - features_prev[j].x;
+          mvRateY += features_next[j].y - features_prev[j].y;
 
         }
         mvRateX = mvRateX /features_next.size();
         mvRateY = mvRateY /features_next.size();
 
         if(pixelSwitch == 0 && debug ==3){
-            cv::circle(cv_ptr->image, cv::Point(mx + mw/2, my + mh/2), 10, CV_RGB(0,255,0));
-            cv::circle(cv_ptr->image, cv::Point(mx + mw/2 + mvRateX, my + mh/2 +mvRateY), 10, CV_RGB(255,0,0));
+          cv::circle(cv_ptr->image, cv::Point(mx + mw/2, my + mh/2), 10, CV_RGB(0,255,0));
+          cv::circle(cv_ptr->image, cv::Point(mx + mw/2 + mvRateX, my + mh/2 +mvRateY), 10, CV_RGB(255,0,0));
         }
 
 
@@ -350,11 +355,11 @@ private:
         // when moving outside of the image, remove face from list
         // ##############################################################
         if(faces[i].x < 0 || faces[i].y < 0 || (faces[i].x + faces[i].width) > (cv_ptr->image.cols) || (faces[i].y+ faces[i].height)  > (cv_ptr->image.rows)){
-            faces.erase (faces.begin()+i);
-            lastSeen.erase (lastSeen.begin()+i);
-            faceID.erase (faceID.begin()+i);
-            detectionLength.erase (detectionLength.begin()+i);
-            i--;
+          faces.erase (faces.begin()+i);
+          lastSeen.erase (lastSeen.begin()+i);
+          faceID.erase (faceID.begin()+i);
+          detectionLength.erase (detectionLength.begin()+i);
+          i--;
         }
 
       }
@@ -364,58 +369,58 @@ private:
       //################### find intersection  #############################
       //####################################################################
       // here we compare the tracked faces against the newly detected faces:
-      // if we have an intersection, the tracked faces is updated with a new detection
+      // if we have an intersection, the tracked faces is udated with a new detection
       // if we have no intersection, the new detection is added to the current faces
       if(gCounter > gFps -1){
-          gCounter = 0;
+        gCounter = 0;
 
-          for (unsigned i = 0; i < newFaces.size(); i++) {
-              int duplicatedFaceDetection = 0;
-              for ( unsigned j = 0; j < faces.size(); j++) {
-                  Rect interSection = faces[j] & newFaces[i];
+        for (unsigned i = 0; i < newFaces.size(); i++) {
+          int duplicatedFaceDetection = 0;
+          for ( unsigned j = 0; j < faces.size(); j++) {
+            Rect interSection = faces[j] & newFaces[i];
 
-                  // all values == 0 means no intersection
-                  if (interSection.width != 0){
-                        // we have intersection
-                        duplicatedFaceDetection = 1;
-                        faces[j] = newFaces[i];
-                        lastSeen[j] = maxTrackingNum;
-                        break;
-                  }
+            // all values == 0 means no intersection
+            if (interSection.width != 0){
+              // we have intersection
+              duplicatedFaceDetection = 1;
+              faces[j] = newFaces[i];
+              lastSeen[j] = maxTrackingNum;
+              break;
+            }
 
-              }
-
-              // if we have no intersection with any face from the list:
-              // we know that a new face has been detected
-              if(duplicatedFaceDetection == 0){
-                  faces.push_back(newFaces[i]);
-                  lastSeen.push_back(initialDetectionNum);
-                  faceID.push_back(IDcounter);
-                  IDcounter++;
-                  detectionLength.push_back(1);
-
-              }
           }
 
+          // if we have no intersection with any face from the list:
+          // we know that a new face has been detected
+          if(duplicatedFaceDetection == 0){
+            faces.push_back(newFaces[i]);
+            lastSeen.push_back(initialDetectionNum);
+            faceID.push_back(IDcounter);
+            IDcounter++;
+            detectionLength.push_back(1);
 
-      //####################################################################
-      //################### count lastSeen #################################
-      //####################################################################
-      // update lastSeen list, and remove faces that havent been seen in a while
-          for (unsigned i = 0; i < faces.size(); i++) {
-              if(lastSeen[i] == 1){
-                  // remove face
-                  faces.erase (faces.begin()+i);
-                  lastSeen.erase (lastSeen.begin()+i);
-                  faceID.erase (faceID.begin()+i);
-                  detectionLength.erase (detectionLength.begin()+i);
-                  i--;
-              } else {
-                  // otherwise update face
-                  lastSeen[i] = lastSeen[i] -1;
-                  detectionLength[i] = detectionLength[i] + 1;
-              }
           }
+        }
+
+
+        //####################################################################
+        //################### count lastSeen #################################
+        //####################################################################
+        // update lastSeen list, and remove faces that havent been seen in a while
+        for (unsigned i = 0; i < faces.size(); i++) {
+          if(lastSeen[i] == 1){
+            // remove face
+            faces.erase (faces.begin()+i);
+            lastSeen.erase (lastSeen.begin()+i);
+            faceID.erase (faceID.begin()+i);
+            detectionLength.erase (detectionLength.begin()+i);
+            i--;
+          } else {
+            // otherwise update face
+            lastSeen[i] = lastSeen[i] -1;
+            detectionLength[i] = detectionLength[i] + 1;
+          }
+        }
       }
 
 
@@ -433,18 +438,20 @@ private:
 
       // print faces on top of image
       if(pixelSwitch == 0){
-          cv_ptr->image = drawFaces(cv_ptr->image);
+        cv_ptr->image = drawFaces(cv_ptr->image);
       } else {
-          // blur faces
-          Mat blurMyFace;
-          for (i = faces.begin(); i != faces.end(); ++i) {
-              Rect cropROI((i->x),(i->y),(i->width), (i->height));
-              blurMyFace = cv_ptr->image(cropROI);
-              blurMyFace = pixelate(blurMyFace,16);
-              blurMyFace.copyTo(cv_ptr->image(cropROI));
-          }
+        // blur faces
+        Mat blurMyFace;
+        for (i = faces.begin(); i != faces.end(); ++i) {
+          Rect cropROI((i->x),(i->y),(i->width), (i->height));
+          blurMyFace = cv_ptr->image(cropROI);
+          blurMyFace = pixelate(blurMyFace,16);
+          blurMyFace.copyTo(cv_ptr->image(cropROI));
+        }
       }
 
+      // print tacking_condition
+      drawConditionText(cv_ptr->image);
 
       // Display Section, images will only displayed if option is selected
       // debug 0 = no display
@@ -455,12 +462,12 @@ private:
         // debug 2 = display image used for detection (gray)
         else if(debug == 2){
           for (i = faces.begin(); i != faces.end(); ++i) {
-              cv::rectangle(
-                gray,
-                cv::Point((i->x)*imgScale, (i->y)*imgScale),
-                cv::Point((i->x)*imgScale + (i->width)*imgScale, (i->y)*imgScale + (i->height)*imgScale),
-                CV_RGB(0, 255, 0),
-                2);
+            cv::rectangle(
+                  gray,
+                  cv::Point((i->x)*imgScale, (i->y)*imgScale),
+                  cv::Point((i->x)*imgScale + (i->width)*imgScale, (i->y)*imgScale + (i->height)*imgScale),
+                  CV_RGB(0, 255, 0),
+                  2);
           }
           cv::imshow(OPENCV_WINDOW, gray);
         }
@@ -471,38 +478,38 @@ private:
       // #############################
       if(publish != 0 ){
 
-          // Output modified video stream
-          if(publish == 1 || publish == 3){
-              image_pub_.publish(cv_ptr->toImageMsg());
+        // Output modified video stream
+        if(publish == 1 || publish == 3){
+          image_pub_.publish(cv_ptr->toImageMsg());
+        }
+
+
+        // publishing coordinates - inside array
+        // #####################################################
+        if(publish > 1){
+          std_msgs::Int32MultiArray myMsg;
+
+          myMsg.data.clear();
+          // publish current fps rate
+          myMsg.data.push_back(fps);
+          // publish number of detected faces
+          myMsg.data.push_back(faces.size());
+          // width of the image
+          myMsg.data.push_back(cv_ptr->image.cols);
+          // height of the image
+          myMsg.data.push_back(cv_ptr->image.rows);
+
+          // publish details for each face
+          for ( unsigned i = 0; i < faces.size(); i++) {
+            myMsg.data.push_back(faceID[i]);
+            myMsg.data.push_back(detectionLength[i]);
+            myMsg.data.push_back(faces[i].x);
+            myMsg.data.push_back(faces[i].y);
+            myMsg.data.push_back(faces[i].width);
+            myMsg.data.push_back(faces[i].height);
           }
-
-
-          // publishing coordinates - inside array
-          // #####################################################
-          if(publish > 1){
-              std_msgs::Int32MultiArray myMsg;
-
-              myMsg.data.clear();
-              // publish current fps rate
-              myMsg.data.push_back(fps);
-              // publish number of detected faces
-              myMsg.data.push_back(faces.size());
-              // width of the image
-              myMsg.data.push_back(cv_ptr->image.cols);
-              // height of the image
-              myMsg.data.push_back(cv_ptr->image.rows);
-
-              // publish details for each face
-              for ( unsigned i = 0; i < faces.size(); i++) {
-                  myMsg.data.push_back(faceID[i]);
-                  myMsg.data.push_back(detectionLength[i]);
-                  myMsg.data.push_back(faces[i].x);
-                  myMsg.data.push_back(faces[i].y);
-                  myMsg.data.push_back(faces[i].width);
-                  myMsg.data.push_back(faces[i].height);
-              }
-              faceCoord_pub.publish(myMsg);
-          }
+          faceCoord_pub.publish(myMsg);
+        }
       }
 
 
@@ -532,140 +539,201 @@ private:
       totalFrameCounter += 1;
       cv::waitKey(3);
     }
+    else
+    {
+      initialize();
 
-    // #########################################
-    // #### used for pixelising images #########
-    // #########################################
-    // takes input image (Mat) and returns a pixelisated
-    // image at the rate "pixelizationRate", higer value:
-    // stronger pixelisation
-    Mat pixelate(Mat myImage, int pixelizationRate){
+      // retrieves the image from the camera driver
+      // ###############################################
+      cv_bridge::CvImagePtr cv_ptr;
+      try
+      {
+        cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+      }
+      catch (cv_bridge::Exception& e)
+      {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return;
+      }
 
-      cv::Mat result = cv::Mat::zeros(myImage.size(), CV_8UC3);
-      for (int i = 0; i < myImage.rows; i += pixelizationRate)
-         {
-             for (int j = 0; j < myImage.cols; j += pixelizationRate)
-             {
-                 cv::Rect rect = cv::Rect(j, i, pixelizationRate, pixelizationRate) &
-                                 cv::Rect(0, 0, myImage.cols, myImage.rows);
+      // print tacking_condition
+      drawConditionText(cv_ptr->image);
 
-                 cv::Mat sub_dst(result, rect);
-                 sub_dst.setTo(cv::mean(myImage(rect)));
+      // publishing
+      // #############################
+      if(publish != 0 ){
 
-             }
-         }
+        // Output modified video stream
+        if(publish == 1 || publish == 3){
+          image_pub_.publish(cv_ptr->toImageMsg());
+        }
+      }
+    }
+  }
 
-      return result;
+  void commandCallBack(const std_msgs::Bool::ConstPtr &msg)
+  {
+    tracking_condition = msg->data;
+  }
+
+  // #########################################
+  // #### used for pixelising images #########
+  // #########################################
+  // takes input image (Mat) and returns a pixelisated
+  // image at the rate "pixelizationRate", higer value:
+  // stronger pixelisation
+  Mat pixelate(Mat myImage, int pixelizationRate){
+
+    cv::Mat result = cv::Mat::zeros(myImage.size(), CV_8UC3);
+    for (int i = 0; i < myImage.rows; i += pixelizationRate)
+    {
+      for (int j = 0; j < myImage.cols; j += pixelizationRate)
+      {
+        cv::Rect rect = cv::Rect(j, i, pixelizationRate, pixelizationRate) &
+            cv::Rect(0, 0, myImage.cols, myImage.rows);
+
+        cv::Mat sub_dst(result, rect);
+        sub_dst.setTo(cv::mean(myImage(rect)));
+
+      }
+    }
+
+    return result;
+  }
+
+
+
+  //####################################################################
+  //##################### drawFaces ####################################
+  //####################################################################
+  //takes the detected faces and daws them on top of the input image
+  cv::Mat drawFaces(cv::Mat myImage) {
+
+
+    if(debug ==3){
+
+      //draw min/max detection box size
+      cv::rectangle(
+            myImage,
+            cv::Point(0, 0),
+            cv::Point(minSize, minSize),
+            CV_RGB(255, 50 , 50),
+            2);
+      cv::rectangle(
+            myImage,
+            cv::Point(0, 0),
+            cv::Point(maxSize, maxSize),
+            CV_RGB(255, 50 , 50),
+            2);
+      cv::rectangle(
+            myImage,
+            cv::Point(0, maxSize),
+            cv::Point(maxSize+1, maxSize+20),
+            CV_RGB(255, 50 , 50),
+            CV_FILLED);
+      cv::putText(myImage, "min/max size", cv::Point(5, maxSize+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+
+      //draw fps numbers
+      string fpsText = "FPS: " + std::to_string((int)fps);
+      cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
+
     }
 
 
 
-    //####################################################################
-    //##################### drawFaces ####################################
-    //####################################################################
-    //takes the detected faces and daws them on top of the input image
-    cv::Mat drawFaces(cv::Mat myImage) {
+    for (unsigned i = 0; i < faces.size(); ++i) {
+      int boxSize = 25;
+      if(faceID[i] > 99){boxSize = 36;}
 
 
-        if(debug ==3){
 
-            //draw min/max detection box size
-            cv::rectangle(
+      if(lastSeen[i] == (maxTrackingNum -1) ){
+
+        // green = newly detected
+        cv::rectangle(
               myImage,
-              cv::Point(0, 0),
-              cv::Point(minSize, minSize),
+              cv::Point((faces[i].x), (faces[i].y)),
+              cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
+              CV_RGB(50, 255 , 50),
+              2);
+
+        cv::rectangle(
+              myImage,
+              cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+              cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
+              CV_RGB(50, 255 , 50),
+              CV_FILLED);
+
+      } else if(lastSeen[i] != 1) {
+
+        // blue = tracked from previous detection
+        cv::rectangle(
+              myImage,
+              cv::Point((faces[i].x), (faces[i].y)),
+              cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
+              CV_RGB(50, 50 , 255),
+              2);
+        cv::rectangle(
+              myImage,
+              cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+              cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
+              CV_RGB(50, 50 , 255),
+              CV_FILLED);
+
+      } else {
+
+        // red = about to disappear
+        cv::rectangle(
+              myImage,
+              cv::Point((faces[i].x), (faces[i].y)),
+              cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
               CV_RGB(255, 50 , 50),
               2);
-            cv::rectangle(
+
+        cv::rectangle(
               myImage,
-              cv::Point(0, 0),
-              cv::Point(maxSize, maxSize),
-              CV_RGB(255, 50 , 50),
-              2);
-            cv::rectangle(
-              myImage,
-              cv::Point(0, maxSize),
-              cv::Point(maxSize+1, maxSize+20),
+              cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
+              cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
               CV_RGB(255, 50 , 50),
               CV_FILLED);
-            cv::putText(myImage, "min/max size", cv::Point(5, maxSize+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
+      }
 
-            //draw fps numbers
-            string fpsText = "FPS: " + std::to_string((int)fps);
-            cv::putText(myImage, fpsText, cv::Point(25,25), CV_FONT_NORMAL, 0.75, Scalar(255,50,50),1,1);
 
-        }
+      // print the ID of the face
+      cv::putText(myImage, std::to_string(faceID[i]), cv::Point(faces[i].x+1,faces[i].y+faces[i].height+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
 
 
 
-        for (unsigned i = 0; i < faces.size(); ++i) {
-            int boxSize = 25;
-            if(faceID[i] > 99){boxSize = 36;}
-
-
-
-            if(lastSeen[i] == (maxTrackingNum -1) ){
-
-                // green = newly detected
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x), (faces[i].y)),
-                  cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
-                  CV_RGB(50, 255 , 50),
-                  2);
-
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
-                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
-                  CV_RGB(50, 255 , 50),
-                  CV_FILLED);
-
-            } else if(lastSeen[i] != 1) {
-
-                // blue = tracked from previous detection
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x), (faces[i].y)),
-                  cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
-                  CV_RGB(50, 50 , 255),
-                  2);
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
-                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
-                  CV_RGB(50, 50 , 255),
-                  CV_FILLED);
-
-            } else {
-
-                // red = about to disappear
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x), (faces[i].y)),
-                  cv::Point((faces[i].x) + (faces[i].width), (faces[i].y) + (faces[i].height)),
-                  CV_RGB(255, 50 , 50),
-                  2);
-
-                cv::rectangle(
-                  myImage,
-                  cv::Point((faces[i].x)-1, (faces[i].y+faces[i].height)),
-                  cv::Point((faces[i].x)+boxSize, (faces[i].y+faces[i].height)+20),
-                  CV_RGB(255, 50 , 50),
-                  CV_FILLED);
-            }
-
-
-            // print the ID of the face
-            cv::putText(myImage, std::to_string(faceID[i]), cv::Point(faces[i].x+1,faces[i].y+faces[i].height+15), CV_FONT_NORMAL, 0.5, Scalar(255,255,255),1,1);
-
-
-
-        }
-
-
-        return myImage;
     }
+
+
+    return myImage;
+  }
+
+  void drawConditionText(cv::Mat &myImage) {
+
+    std::string condition_text = tracking_condition ? "VISION PROCESSING : ON" : "VISION PROCESSING : OFF";
+    int x_pos = myImage.cols / 2 - 200;
+    if(x_pos < 0)
+      x_pos = 0;
+    int y_pos = (myImage.rows < 50) ? (myImage.rows / 2) : 50;
+    cv::putText(myImage, condition_text, cv::Point(x_pos, y_pos), CV_FONT_NORMAL, 1, Scalar(255,255,255),1,1);
+  }
+
+  void initialize() {
+    // skips images on detection
+    gFps = 2;
+
+    // counting variables
+    counter = 0;
+    gCounter = gFps -1;
+    fps = -1;
+    totalFrameCounter = 0;
+    totalTime = 0;
+    totalDetections = 0;
+    IDcounter = 1;
+    fpsWindowSize = 10;
+  }
 
 
 public:
@@ -707,6 +775,7 @@ public:
     maxNumFeatures = 15;
     maxTrackingNum = 60;
 
+
     // skips images on detection
     gFps = 2;
 
@@ -722,6 +791,8 @@ public:
 
 
     // other variables
+    ros::NodeHandle priv_nh("~");
+    priv_nh.param("start_condition", tracking_condition , true);
 
     // determines which interface is shown
     debug = 0;
@@ -748,27 +819,27 @@ public:
       printf("cascade.load_0() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt.xml\n");
       exit(0);
-      }
+    }
     if (face_cascade_1.load(casc1) == false) {
       printf("cascade.load_1() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt2.xml\n");
       exit(0);
-      }
+    }
     if (face_cascade_2.load(casc2) == false) {
       printf("cascade.load_2() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt_tree.xml\n");
       exit(0);
-      }
+    }
     if (face_cascade_3.load(casc3) == false) {
       printf("cascade.load_3() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_default.xml\n");
       exit(0);
-      }
+    }
     if (face_cascade_4.load(casc4) == false) {
       printf("cascade.load_4() failed...\n");
       printf("The missing cascade file is /include/face_detection/lbpCascades/lbpcascade_frontalface.xml\n");
       exit(0);
-      }
+    }
 
     // prints out OpenCV build information for debugging
     printf("OpenCV: %s \n", cv::getBuildInformation().c_str());
@@ -776,8 +847,8 @@ public:
 
     //init fps Window Queue
     for (int i = 0;i < (fpsWindowSize);i++) {
-        struct timeval now;
-        fpsTimeQueue.push(now);
+      struct timeval now;
+      fpsTimeQueue.push(now);
     }
 
 
@@ -791,6 +862,9 @@ public:
 
     // publishing face coordinates
     faceCoord_pub = n.advertise<std_msgs::Int32MultiArray>("faceCoord", 1000);
+
+    // subscribing command of face tracking
+    command_sub = priv_nh.subscribe("command", 1, &FaceDetector::commandCallBack, this);
 
     //generate OpenCV window
     if(debug != 0){
@@ -866,44 +940,44 @@ public:
     // selecting the correct flag for the
     // ######################################
     switch(config.myflag){
-      case 0 :
-        myflag = CV_HAAR_SCALE_IMAGE;
-        break;
-      case 1 :
-        myflag = CV_HAAR_FIND_BIGGEST_OBJECT;
-        break;
-      case 2 :
-        myflag = CV_HAAR_DO_CANNY_PRUNING;
-        break;
-      case 3 :
-        myflag = CV_HAAR_DO_ROUGH_SEARCH;
-        break;
-      default:
-        myflag = CV_HAAR_SCALE_IMAGE;
-        break;
-      }
+    case 0 :
+      myflag = CV_HAAR_SCALE_IMAGE;
+      break;
+    case 1 :
+      myflag = CV_HAAR_FIND_BIGGEST_OBJECT;
+      break;
+    case 2 :
+      myflag = CV_HAAR_DO_CANNY_PRUNING;
+      break;
+    case 3 :
+      myflag = CV_HAAR_DO_ROUGH_SEARCH;
+      break;
+    default:
+      myflag = CV_HAAR_SCALE_IMAGE;
+      break;
+    }
 
     // selecting the correct cascade for the
     // ######################################
     switch (cascadeValue) {
-      case 0:
-        face_cascade = face_cascade_0;
-        break;
-      case 1:
-        face_cascade = face_cascade_1;
-        break;
-      case 2:
-        face_cascade = face_cascade_2;
-        break;
-      case 3:
-        face_cascade = face_cascade_3;
-        break;
-      case 4:
-        face_cascade = face_cascade_4;
-        break;
-      default:
-        face_cascade = face_cascade_0;
-        break;
+    case 0:
+      face_cascade = face_cascade_0;
+      break;
+    case 1:
+      face_cascade = face_cascade_1;
+      break;
+    case 2:
+      face_cascade = face_cascade_2;
+      break;
+    case 3:
+      face_cascade = face_cascade_3;
+      break;
+    case 4:
+      face_cascade = face_cascade_4;
+      break;
+    default:
+      face_cascade = face_cascade_0;
+      break;
     }
 
 

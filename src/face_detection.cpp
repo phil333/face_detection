@@ -218,7 +218,7 @@ private:
           neighborsValue,             // minimum neighbors
           0|myflag,                   // flags
           cv::Size(minSize*imgScale, minSize*imgScale), // minimum size
-          cv::Size(maxSize*imgScale, maxSize*imgScale)  // minimum size
+          cv::Size(maxSize*imgScale, maxSize*imgScale)  // maximum size
         );
 
       }
