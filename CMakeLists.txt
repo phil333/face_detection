@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   dynamic_reconfigure
+  OpenCV
 )
 
 ## System dependencies are found with CMake's conventions
@@ -127,21 +128,21 @@ include_directories(
 
 # set this value to the directory of you DLib installation
 # for example: include(/home/user/dlib-X.X/dlib/cmake)
-#include(../dlib/cmake)
+include(/home/jar78/Downloads/dlib-19.15/dlib/cmake)
 
-#set(USE_AVX_INSTRUCTIONS 1)
+set(USE_AVX_INSTRUCTIONS 1)
 
 
-#add_executable(face_detection_dlib src/face_detection_dlib.cpp)
-#add_dependencies(face_detection_dlib ${PROJECT_NAME}_gencfg)
-#target_link_libraries(face_detection_dlib dlib ${catkin_LIBRARIES})
+add_executable(face_detection_dlib src/face_detection_dlib.cpp)
+add_dependencies(face_detection_dlib ${PROJECT_NAME}_gencfg)
+target_link_libraries(face_detection_dlib dlib ${catkin_LIBRARIES})
 
 
 ## Declare a cpp executable
 # add_executable(face_detection_node src/face_detection_node.cpp)
 add_executable(face_detection src/face_detection.cpp)
 
-add_executable(face_detection_cuda src/face_detection_cuda.cpp)
+#add_executable(face_detection_cuda src/face_detection_cuda.cpp)
 add_executable(face_tracking src/face_tracking.cpp)
 #add_executable(face_tracking_cuda src/face_tracking_cuda.cpp)
 add_executable(face_listener src/face_listener.cpp)
@@ -152,7 +153,7 @@ add_executable(face_listener src/face_listener.cpp)
 add_dependencies(face_detection ${PROJECT_NAME}_gencfg)
 add_dependencies(face_tracking ${PROJECT_NAME}_gencfg)
 # add_dependencies(face_detection_node face_detection_generate_messages_cpp)
-add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
+#add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
 #add_dependencies(face_tracking_cuda ${PROJECT_NAME}_gencfg)
 
 
@@ -163,9 +164,9 @@ add_dependencies(face_detection_cuda ${PROJECT_NAME}_gencfg)
 target_link_libraries(face_detection
    ${catkin_LIBRARIES}
 )
-target_link_libraries(face_detection_cuda
-   ${catkin_LIBRARIES}
-)
+#target_link_libraries(face_detection_cuda
+   #${catkin_LIBRARIES}
+#)
 target_link_libraries(face_tracking
    ${catkin_LIBRARIES}
 )

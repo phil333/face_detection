@@ -65,11 +65,11 @@
 #include <sstream>
 #include <string>
 #include <time.h>
-#include "opencv2/gpu/gpu.hpp"
+#include "opencv2/cudaarithm.hpp"
 
 using namespace std;
 using namespace cv;
-using namespace cv::gpu;
+using namespace cv::cuda;
 
 // OpenCV publishing windows
 static const std::string OPENCV_WINDOW = "Image window";
@@ -126,12 +126,12 @@ class FaceDetector
 
   char myflag;
   cv::CascadeClassifier face_cascade;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu_0;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu_1;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu_2;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu_3;
-  cv::gpu::CascadeClassifier_GPU face_cascade_gpu_4;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda_0;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda_1;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda_2;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda_3;
+  cv::cuda::CascadeClassifier_GPU face_cascade_cuda_4;
   std::vector<cv::Rect> faces;
   int gFps;
   int gCounter;
@@ -191,45 +191,45 @@ private:
       gCounter += 1;
 
 
-	  cv::gpu::GpuMat gpuImg;
-	  cv::gpu::GpuMat gpuGray;
+	  cv::cuda::GpuMat cudaImg;
+	  cv::cuda::GpuMat cudaGray;
 
 	  Mat cvt_intermediate;
 	  resize(cv_ptr->image, cvt_intermediate, Size(), imgScale , imgScale);
 
-	  gpuImg.upload(cvt_intermediate);
+	  cudaImg.upload(cvt_intermediate);
       // change contrast: 0.5 = half  ; 2.0 = double
-	  gpuImg.convertTo(gpuImg, -1, contrastFactor, 0);
+	  cudaImg.convertTo(cudaImg, -1, contrastFactor, 0);
 
       // create B&W image
-	  cv::gpu::cvtColor(gpuImg, gpuGray, CV_BGR2GRAY );
+	  cv::cuda::cvtColor(cudaImg, cudaGray, CV_BGR2GRAY );
 
 
       //equalize the histogram
       if(histOnOff == 1){
-		cv::gpu::equalizeHist( gpuGray, gpuGray );
+		cv::cuda::equalizeHist( cudaGray, cudaGray );
       }
 
 
       if(blurFactor > 0){
-		cv::gpu::blur( gpuGray, gpuGray, Size( blurFactor, blurFactor) );
+		cv::cuda::blur( cudaGray, cudaGray, Size( blurFactor, blurFactor) );
       }
 
       //####################################################################
       //####################### detection part #############################
       //####################################################################
-		//gpuGray.download(gray);
+		//cudaGray.download(gray);
 		//cv::imshow(OPENCV_WINDOW, gray);
       // depending on the gFps setting, this part is only executed every couple of frames
 	  int detections_number = 0;
       if(gCounter > gFps -1){
         gCounter = 0;
 		  //#############################
-		  //gpu detection part
+		  //cuda detection part
 		  //
 		  GpuMat objbuf;
-		    detections_number = face_cascade_gpu.detectMultiScale(
-		      gpuGray,                       // input image (grayscale)
+		    detections_number = face_cascade_cuda.detectMultiScale(
+		      cudaGray,                       // input image (grayscale)
 		      objbuf,                      // output variable containing face rectangle
 			  cv::Size(maxSize*imgScale, maxSize*imgScale),  // maximum size
 			  cv::Size(minSize*imgScale, minSize*imgScale),
@@ -244,9 +244,9 @@ private:
 
 		faces.clear();
 
-		Rect* gpuFaces = obj_host.ptr<Rect>();
+		Rect* cudaFaces = obj_host.ptr<Rect>();
 	  	for(int i = 0; i < detections_number; ++i){
-			faces.push_back(gpuFaces[i]);
+			faces.push_back(cudaFaces[i]);
 			}
 
       }
@@ -278,7 +278,7 @@ private:
           cv::imshow(OPENCV_WINDOW, cv_ptr->image);
         }
         else if(debug == 2){
-		  gpuGray.download(gray);
+		  cudaGray.download(gray);
           for (i = faces.begin(); i != faces.end(); ++i) {
             //if(i->width <250){
               cv::rectangle(
@@ -454,7 +454,7 @@ public:
 	   } else {
 	      printf("CUDA device found  \n");
 	   }
-	cv::gpu::printShortCudaDeviceInfo(cv::gpu::getDevice());
+	cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
 
     printf("OpenCV: %s \n", cv::getBuildInformation().c_str());
 
@@ -462,27 +462,27 @@ public:
 
     //loads in the different cascade detection files
     printf("################\n" );
-    if (face_cascade_gpu_0.load(casc0) == false) {
+    if (face_cascade_cuda_0.load(casc0) == false) {
       printf("cascade.load_0() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt.xml\n");
       exit(0);
       }
-    if (face_cascade_gpu_1.load(casc1) == false) {
+    if (face_cascade_cuda_1.load(casc1) == false) {
       printf("cascade.load_1() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt2.xml\n");
       exit(0);
       }
-    if (face_cascade_gpu_2.load(casc2) == false) {
+    if (face_cascade_cuda_2.load(casc2) == false) {
       printf("cascade.load_2() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_alt_tree.xml\n");
       exit(0);
       }
-    if (face_cascade_gpu_3.load(casc3) == false) {
+    if (face_cascade_cuda_3.load(casc3) == false) {
       printf("cascade.load_3() failed...\n");
       printf("The missing cascade file is /include/face_detection/HaarCascades/haarcascade_frontalface_default.xml\n");
       exit(0);
       }
-    if (face_cascade_gpu_4.load(casc4) == false) {
+    if (face_cascade_cuda_4.load(casc4) == false) {
       printf("cascade.load_4() failed...\n");
       printf("The missing cascade file is /include/face_detection/lbpCascades/lbpcascade_frontalface.xml\n");
       exit(0);
@@ -604,22 +604,22 @@ public:
 
     switch (cascadeValue) {
       case 0:
-        face_cascade_gpu = face_cascade_gpu_0;
+        face_cascade_cuda = face_cascade_cuda_0;
         break;
       case 1:
-        face_cascade_gpu = face_cascade_gpu_1;
+        face_cascade_cuda = face_cascade_cuda_1;
         break;
       case 2:
-        face_cascade_gpu = face_cascade_gpu_2;
+        face_cascade_cuda = face_cascade_cuda_2;
         break;
       case 3:
-        face_cascade_gpu = face_cascade_gpu_3;
+        face_cascade_cuda = face_cascade_cuda_3;
         break;
       case 4:
-        face_cascade_gpu = face_cascade_gpu_4;
+        face_cascade_cuda = face_cascade_cuda_4;
         break;
       default:
-        face_cascade_gpu = face_cascade_gpu_0;
+        face_cascade_cuda = face_cascade_cuda_0;
         break;
     }
 
